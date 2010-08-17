@@ -1,0 +1,3 @@
+[submodule "vendor/node-paperboy"]
+	path = vendor/node-paperboy
+	url = http://github.com/felixge/node-paperboy.git

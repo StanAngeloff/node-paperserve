@@ -1,0 +1,10 @@
+{
+  "name":        "paperserve",
+  "description": "Quick and dirty web server from your working directory using node-paperboy",
+  "keywords":    ["web", "server"],
+  "version":     "0.0.1",
+  "author":      "Stan Angeloff <stanimir@angeloff.name>",
+  "engines":     { "node": ">=0.1.99" },
+  "bin":         { "paperserve": "./bin/paperserve" },
+  "directories": { "resources": "./resources", "vendor": "./vendor" }
+}

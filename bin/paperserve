@@ -1,0 +1,117 @@
+#!/usr/bin/env node
+
+(function() {
+
+var sys      = require('sys');
+var fs       = require('fs');
+var path     = require('path');
+var http     = require('http');
+var paperboy = require('../vendor/node-paperboy/lib/paperboy');
+
+var options  = {
+  webroot: process.cwd(),
+  quiet:   false,
+  port:    8000
+};
+
+var envName    = process.argv.shift();
+var scriptName = path.basename(process.argv.shift());
+
+var usage = function usage() {
+  sys.puts('\n' + scriptName + ' is a quick and dirty web server from your working directory.');
+  sys.puts('\nUsage:\n');
+  sys.puts('  ' + scriptName + ' [path-to-serve]');
+  sys.puts('\nAvailable options:\n');
+  sys.puts('  -p, --port [PORT]  set the port to listen on, default ' + options.port);
+  sys.puts('  -q, --quiet        turn off any logging, default ' + options.quiet);
+  sys.puts('  -h, --help         display this help message');
+}
+
+var key, value, pairs;
+while (process.argv.length) {
+  key = process.argv.shift().replace(/^-+/, '');
+  if (key.indexOf('=') > 0) {
+    pairs = key.split('=');
+    key   = pairs.shift();
+    value = pairs.join('=');
+  } else {
+    value = false;
+  }
+  switch (key.charAt(0).toLowerCase()) {
+    case 'p': /* --port */
+      options.port = Number(value || process.argv.shift());
+      break;
+    case 'q': /* --quiet */
+      options.quiet = true;
+      break;
+    case 'h': /* --help */
+      usage();
+      process.exit(0);
+    default:
+      options.webroot = key;
+  }
+}
+
+var logSize = 0, log = function log() {
+  if ( ! options.quiet) {
+    var args     = Array.prototype.slice.call(arguments);
+    var colors   = {
+      red:   '\033[0;31m',
+      green: '\033[0;32m'
+    }
+    sys.puts(
+      (Object.prototype.hasOwnProperty.call(colors, args[0]) ? colors[args.shift()] : '') +
+      (++ logSize > 2 ? '' : '>>> ') +
+      scriptName + ': ' +
+      args.join('') +
+      '\033[0m'
+    );
+  }
+}
+
+var format = function format(status, url, message) {
+  return 'HTTP/1.1 ' + status + " '" + url + "'" + (message ? ' -- ' + message : '');
+}
+
+var deliver = function deliver(webroot, request, response, errorBlock) {
+  paperboy
+  .deliver(webroot, request, response)
+  .addHeader('Expires', 30 /* days */ * 24 * 60 * 60)
+  .after(function(status) {
+    log(format(status, request.url));
+  })
+  .error(function(status, message) {
+    response.writeHead(status, { 'Content-Type': 'text/plain' });
+    response.write(message);
+    response.end();
+    log('red', format(status, request.url, message));
+  })
+  .otherwise(function(error) {
+    errorBlock && errorBlock(error, 404);
+  });
+};
+
+fs.realpath(options.webroot, function(error, absolutePath) {
+  if (absolutePath) {
+    options.webroot = absolutePath.replace(/\/+$/, '');
+    http.createServer(function(request, response) {
+      deliver(options.webroot, request, response, function(error, status) {
+        if (404 === status && '/favicon.ico' === request.url) {
+          deliver(path.join(__dirname, '/../resources'), request, response);
+        } else {
+          var message = error.toString();
+          response.writeHead(status, { 'Content-Type': 'text/plain' });
+          response.write(message);
+          response.end();
+          log('red', format(status, request.url, message));
+        }
+      });
+    }).listen(options.port);
+    log('green', 'running on port ', options.port, ", serving from '", options.webroot, "'");
+    log('green', '  Press Ctrl-C to stop.');
+  } else {
+    log('red', error.toString());
+  }
+});
+
+})();
